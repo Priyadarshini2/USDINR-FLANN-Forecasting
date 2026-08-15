@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>USD/INR Exchange Rate Prediction</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <!-- ================================================= -->
+    <!-- HEADER -->
+    <!-- ================================================= -->
+
+    <header class="hero">
+
+        <div class="badge">
+            MACHINE LEARNING FORECASTING
+        </div>
+
+        <h1>
+            USD/INR Exchange Rate Prediction
+        </h1>
+
+        <p>
+            FLANN &nbsp;•&nbsp; MLP &nbsp;•&nbsp; ARIMA(1,1,1)
+        </p>
+
+    </header>
+
+
+    <!-- ================================================= -->
+    <!-- PREDICTION INPUT -->
+    <!-- ================================================= -->
+
+    <section class="card">
+
+        <div class="section-title">
+
+            <div>
+                <h2>Predict Next USD/INR Rate</h2>
+
+                <p>
+                    Enter the four previous USD/INR observations
+                    to predict the next exchange rate.
+                </p>
+            </div>
+
+        </div>
+
+
+        {% if error %}
+
+        <div class="error">
+            {{ error }}
+        </div>
+
+        {% endif %}
+
+
+        <form method="POST">
+
+            <div class="input-grid">
+
+                <div class="input-group">
+
+                    <label>
+                        t − 4
+                    </label>
+
+                    <input
+                        type="number"
+                        step="0.01"
+                        name="lag_4"
+                        value="{{ input_values[0] }}"
+                        placeholder="e.g. 95.68"
+                        required
+                    >
+
+                    <small>
+                        Four observations ago
+                    </small>
+
+                </div>
+
+
+                <div class="input-group">
+
+                    <label>
+                        t − 3
+                    </label>
+
+                    <input
+                        type="number"
+                        step="0.01"
+                        name="lag_3"
+                        value="{{ input_values[1] }}"
+                        placeholder="e.g. 95.69"
+                        required
+                    >
+
+                    <small>
+                        Three observations ago
+                    </small>
+
+                </div>
+
+
+                <div class="input-group">
+
+                    <label>
+                        t − 2
+                    </label>
+
+                    <input
+                        type="number"
+                        step="0.01"
+                        name="lag_2"
+                        value="{{ input_values[2] }}"
+                        placeholder="e.g. 95.69"
+                        required
+                    >
+
+                    <small>
+                        Two observations ago
+                    </small>
+
+                </div>
+
+
+                <div class="input-group">
+
+                    <label>
+                        t − 1
+                    </label>
+
+                    <input
+                        type="number"
+                        step="0.01"
+                        name="lag_1"
+                        value="{{ input_values[3] }}"
+                        placeholder="e.g. 95.00"
+                        required
+                    >
+
+                    <small>
+                        Most recent observation
+                    </small>
+
+                </div>
+
+            </div>
+
+
+            <div class="target-info">
+
+                <span class="target-icon">→</span>
+
+                <div>
+
+                    <strong>
+                        Target: t
+                    </strong>
+
+                    <p>
+                        The model predicts the next USD/INR
+                        exchange-rate observation.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <button type="submit">
+
+                Predict USD/INR
+
+            </button>
+
+        </form>
+
+    </section>
+
+
+    <!-- ================================================= -->
+    <!-- PREDICTION RESULTS -->
+    <!-- ================================================= -->
+
+    {% if prediction is not none %}
+
+    <section class="card">
+
+        <div class="section-heading">
+
+            <h2>Prediction Results</h2>
+
+            <span class="live-badge">
+                PREDICTION GENERATED
+            </span>
+
+        </div>
+
+
+        <div class="results-grid">
+
+
+            <div class="result-box best">
+
+                <div class="model-label">
+
+                    <span class="trophy">★</span>
+
+                    FLANN
+
+                </div>
+
+                <div class="value">
+
+                    {{ "%.4f"|format(prediction) }}
+
+                </div>
+
+                <div class="unit">
+                    USD/INR
+                </div>
+
+                <div class="best-label">
+                    Best test performance
+                </div>
+
+            </div>
+
+
+            <div class="result-box">
+
+                <div class="model-label">
+                    MLP
+                </div>
+
+                <div class="value">
+
+                    {{ "%.4f"|format(mlp_prediction) }}
+
+                </div>
+
+                <div class="unit">
+                    USD/INR
+                </div>
+
+            </div>
+
+
+            <div class="result-box">
+
+                <div class="model-label">
+                    ARIMA(1,1,1)
+                </div>
+
+                <div class="value">
+
+                    {{ "%.4f"|format(arima_prediction) }}
+
+                </div>
+
+                <div class="unit">
+                    USD/INR
+                </div>
+
+            </div>
+
+
+        </div>
+
+    </section>
+
+    {% endif %}
+
+
+    <!-- ================================================= -->
+    <!-- BEST MODEL -->
+    <!-- ================================================= -->
+
+    {% if metrics %}
+
+    <section class="best-model-card">
+
+        <div class="best-model-icon">
+            ★
+        </div>
+
+        <div>
+
+            <div class="best-model-title">
+                Best Performing Model
+            </div>
+
+            <div class="best-model-name">
+                FLANN
+            </div>
+
+            <div class="best-model-description">
+
+                FLANN achieved the lowest MAPE on the
+                48-observation independent test set.
+
+            </div>
+
+        </div>
+
+
+        <div class="best-model-metric">
+
+            <span>
+                MAPE
+            </span>
+
+            <strong>
+                0.2899%
+            </strong>
+
+        </div>
+
+    </section>
+
+    {% endif %}
+
+
+    <!-- ================================================= -->
+    <!-- MODEL PERFORMANCE -->
+    <!-- ================================================= -->
+
+    {% if metrics %}
+
+    <section class="card">
+
+        <div class="section-heading">
+
+            <div>
+
+                <h2>Model Performance</h2>
+
+                <p>
+                    Evaluation on the same 48 unseen test observations.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <div class="table-wrapper">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+
+                        <th>Model</th>
+
+                        <th>MAPE (%)</th>
+
+                        <th>MAE</th>
+
+                        <th>RMSE</th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+                    {% for row in metrics %}
+
+                    <tr
+                        {% if row["Model"] == "FLANN" %}
+                        class="best-row"
+                        {% endif %}
+                    >
+
+                        <td>
+
+                            {% if row["Model"] == "FLANN" %}
+
+                            <span class="best-dot">
+                                ★
+                            </span>
+
+                            {% endif %}
+
+                            {{ row["Model"] }}
+
+                        </td>
+
+                        <td>
+                            {{ "%.4f"|format(row["MAPE"]) }}
+                        </td>
+
+                        <td>
+                            {{ "%.4f"|format(row["MAE"]) }}
+                        </td>
+
+                        <td>
+                            {{ "%.4f"|format(row["RMSE"]) }}
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+    {% endif %}
+
+
+    <!-- ================================================= -->
+    <!-- GRAPH 1 -->
+    <!-- ================================================= -->
+
+    <section class="card">
+
+        <div class="section-heading">
+
+            <div>
+
+                <h2>Actual vs Predicted USD/INR</h2>
+
+                <p>
+                    Comparison of model predictions against
+                    actual values in the test period.
+                </p>
+
+            </div>
+
+        </div>
+
+        <div class="chart-container">
+
+            <img
+                src="{{ url_for(
+                    'static',
+                    filename='graphs/actual_vs_predicted.png'
+                ) }}"
+                alt="Actual vs Predicted USD INR"
+            >
+
+        </div>
+
+    </section>
+
+
+    <!-- ================================================= -->
+    <!-- GRAPH 2 -->
+    <!-- ================================================= -->
+
+    <section class="card">
+
+        <div class="section-heading">
+
+            <div>
+
+                <h2>Model Error Comparison</h2>
+
+                <p>
+                    Lower MAPE indicates better forecasting
+                    performance.
+                </p>
+
+            </div>
+
+        </div>
+
+        <div class="chart-container">
+
+            <img
+                src="{{ url_for(
+                    'static',
+                    filename='graphs/model_comparison.png'
+                ) }}"
+                alt="Model MAPE Comparison"
+            >
+
+        </div>
+
+    </section>
+
+
+    <!-- ================================================= -->
+    <!-- PROJECT INFORMATION -->
+    <!-- ================================================= -->
+
+    <section class="card">
+
+        <div class="section-heading">
+
+            <div>
+
+                <h2>Project Overview</h2>
+
+                <p>
+                    Experimental configuration used for the
+                    forecasting study.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <div class="info-grid">
+
+
+            <div class="info-box">
+
+                <span>
+                    DATASET
+                </span>
+
+                <strong>
+                    USD/INR
+                </strong>
+
+                <p>
+                    Historical exchange-rate observations
+                </p>
+
+            </div>
+
+
+            <div class="info-box">
+
+                <span>
+                    SUPERVISED SAMPLES
+                </span>
+
+                <strong>
+                    383
+                </strong>
+
+                <p>
+                    Four-lag transformation
+                </p>
+
+            </div>
+
+
+            <div class="info-box">
+
+                <span>
+                    TRAINING
+                </span>
+
+                <strong>
+                    335
+                </strong>
+
+                <p>
+                    Chronological training observations
+                </p>
+
+            </div>
+
+
+            <div class="info-box">
+
+                <span>
+                    TESTING
+                </span>
+
+                <strong>
+                    48
+                </strong>
+
+                <p>
+                    Unseen test observations
+                </p>
+
+            </div>
+
+
+        </div>
+
+    </section>
+
+
+    <!-- ================================================= -->
+    <!-- METHODOLOGY -->
+    <!-- ================================================= -->
+
+    <section class="card methodology">
+
+        <h2>
+            Methodology
+        </h2>
+
+
+        <div class="method-grid">
+
+
+            <div>
+
+                <div class="method-number">
+                    01
+                </div>
+
+                <h3>
+                    Lag Feature Engineering
+                </h3>
+
+                <p>
+                    The previous four USD/INR observations
+                    are used as input features.
+                </p>
+
+            </div>
+
+
+            <div>
+
+                <div class="method-number">
+                    02
+                </div>
+
+                <h3>
+                    Functional Expansion
+                </h3>
+
+                <p>
+                    FLANN transforms inputs using polynomial
+                    and trigonometric functions to capture
+                    nonlinear relationships.
+                </p>
+
+            </div>
+
+
+            <div>
+
+                <div class="method-number">
+                    03
+                </div>
+
+                <h3>
+                    Model Comparison
+                </h3>
+
+                <p>
+                    FLANN, MLP and ARIMA(1,1,1) are evaluated
+                    using MAPE, MAE and RMSE.
+                </p>
+
+            </div>
+
+
+        </div>
+
+    </section>
+
+
+    <!-- ================================================= -->
+    <!-- FOOTER -->
+    <!-- ================================================= -->
+
+    <footer>
+
+        <strong>
+            USD/INR Exchange Rate Forecasting System
+        </strong>
+
+        <br>
+
+        FLANN • MLP • ARIMA(1,1,1)
+
+    </footer>
+
+
+</div>
+
+</body>
+
+</html>
