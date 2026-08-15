@@ -1,126 +1,530 @@
 # USD/INR Exchange Rate Forecasting using FLANN
 
-### FLANN • MLP • ARIMA(1,1,1)
+### FLANN • MLP • ARIMA(1,1,1) • MATLAB • Python • Flask
 
-A comparative time-series forecasting project for 1-day-ahead
-USD/INR exchange-rate prediction using real historical exchange-rate data.
+A comparative time-series forecasting project for **1-day-ahead USD/INR exchange-rate prediction** using real historical exchange-rate data.
 
-The project evaluates three approaches:
+The project investigates whether a **Functional Link Artificial Neural Network (FLANN)** can effectively model nonlinear exchange-rate relationships and compares its performance with a **Multilayer Perceptron (MLP)** and the classical **ARIMA(1,1,1)** time-series model.
 
-- Functional Link Artificial Neural Network (FLANN)
-- Multilayer Perceptron (MLP)
-- ARIMA(1,1,1)
+The original research implementation was developed in **MATLAB**. A reproducible **Python implementation** was subsequently developed with automated data preparation, model training, evaluation, visualization, and a **Flask-based web interface** for prediction.
 
-The original research work was developed in MATLAB. A reproducible Python
-implementation was subsequently developed using real USD/INR data, with
-automated training, evaluation and visualization.
+## Project Objective
 
-## Data source (real, not synthetic)
+The objective is to predict the **next USD/INR exchange-rate observation** using recent historical exchange-rate values.
 
-Historical USD/INR rates are pulled from the [`datasets/exchange-rates`](https://github.com/datasets/exchange-rates)
-GitHub data package, which republishes the U.S. Federal Reserve's
-[H.10 Foreign Exchange Rates](https://www.federalreserve.gov/releases/h10/)
-release (Indian Rupees per U.S. Dollar). This is a standard reference
-series with data back to 1973, updated on U.S. business days.
+The study compares:
+- **FLANN** — Functional Link Artificial Neural Network
+- **MLP** — Multilayer Perceptron
+- **ARIMA(1,1,1)** — Classical statistical time-series model
 
-The project uses the most recent **383 valid daily observations** at the
-time of download, split **335 train / 48 test** — a period that, at the
-time this was built, ran from late January 2025 to early August 2026 and
-covered a fairly strong dollar-appreciation trend (~84 → ~96 INR/USD).
+The models are evaluated using MAPE, MAE and RMSE on an unseen test dataset.
 
-## Project structure
+## Problem Statement
 
-```
-USDINR_FLANN_REALDATA/
-├── data/
-│   ├── usdinr_raw.csv       # full downloaded history (real, all dates)
-│   └── usdinr_383.csv       # 387 most recent raw points -> 383 usable samples
-├── src/
-│   ├── download_data.py     # pulls real data from GitHub/FRED
-│   ├── prepare_data.py      # cleans + extracts the 383-record window
-│   ├── flann_model.py       # FLANN implemented from scratch (NumPy)
-│   ├── model_comparison.py  # MLP, ARIMA, metrics, shared utilities
-│   └── run_project.py       # orchestrates the full pipeline end-to-end
-├── matlab/
-│   └── run_all.m            # equivalent MATLAB implementation
-├── results/
-│   ├── model_comparison.csv
-│   ├── test_predictions.csv
-│   └── forecast_comparison.png
-├── requirements.txt
-├── run_project.bat          # Windows one-click runner
-├── README.md
-└── INTERVIEW_NOTES.md       # talking points / anticipated interview Q&A
+Exchange rates are influenced by complex economic and market factors and may exhibit nonlinear patterns that are difficult to capture using traditional linear forecasting approaches.
+
+> **Can a Functional Link Artificial Neural Network effectively predict the next USD/INR exchange-rate observation using recent historical observations, and how does its performance compare with MLP and ARIMA(1,1,1)?**
+
+## Dataset
+
+The project uses **real historical USD/INR exchange-rate observations**, not synthetic data. The historical series is based on the U.S. Federal Reserve's **H.10 Foreign Exchange Rates** data.
+
+| Description | Value |
+|---|---:|
+| Raw observations selected | 387 |
+| Supervised samples | **383** |
+| Training samples | **335** |
+| Testing samples | **48** |
+| Input lag window | **4 observations** |
+| Forecast horizon | **1 day ahead** |
+
+The four previous observations are used to predict the next observation:
+
+```text
+t-4   t-3   t-2   t-1
+ │     │     │     │
+ └─────┴─────┴─────┴──────► Model
+                              │
+                              ▼
+                         Prediction t
 ```
 
-## How to run
+# Methodology
 
-```bash
-pip install -r requirements.txt
+## 1. Data Collection
 
-python src/download_data.py     # fetch real USD/INR history
-python src/prepare_data.py      # extract the 383-record modeling window
-python src/run_project.py       # train FLANN, MLP, ARIMA; evaluate; save results
+Historical USD/INR data is downloaded programmatically.
+
+The raw dataset is preserved in:
+
+```text
+data/usdinr_raw.csv
 ```
 
-Or, on Windows, just double-click `run_project.bat`.
+## 2. Data Preparation
 
-`run_project.py` will auto-download/prepare data if `data/usdinr_383.csv`
-is missing, so `python src/run_project.py` alone is also enough for a
-fresh checkout. Pass `--download` to force a fresh pull of the latest data.
+The time series is transformed into a supervised-learning format using a **4-day lag window**.
 
-### MATLAB
-
-```matlab
-cd matlab
-run_all
+```text
+lag_4   lag_3   lag_2   lag_1   target
+86.42   86.20   86.34   86.52   86.61
+86.20   86.34   86.52   86.61   86.55
+86.34   86.52   86.61   86.55   86.54
 ```
 
-(Requires the data/ files to already exist — run the Python data steps
-first if starting from a clean checkout.)
+Therefore:
 
-## Methodology
+```text
+Input  = [t-4, t-3, t-2, t-1]
+Target = t
+```
 
-- **Features**: each model predicts day *t* from the exchange rate on
-  days *t-1* through *t-4* (a 4-day lag window).
-- **Scaling**: inputs/targets are min-max scaled to [-1, 1], fit on the
-  training set only (no leakage).
-- **Evaluation protocol**: one-step-ahead walk-forward. Every model
-  predicts each test day using the *true* values of the preceding 4 days
-  (ARIMA is re-fit at each of the 48 steps as new true observations
-  arrive — the standard way ARIMA is evaluated for short-horizon
-  day-ahead forecasting).
-- **Hyperparameters** (FLANN: 3 trigonometric expansions, lr=0.12, 4000
-  epochs; MLP: hidden layers (8,4), tanh, lr=0.01) were selected via a
-  grid search on a validation split carved out of the *training* data
-  only — the test set was never used for model selection.
+This produces **383 supervised samples**.
 
-## Results
+## 3. Train/Test Split
 
-The final real-data experiment was evaluated on 48 unseen test observations.
+The observations are divided chronologically:
 
-| Model | MAPE (%) | RMSE | MAE |
+```text
+335 observations → Training
+48 observations  → Testing
+```
+
+No random shuffling is used because this is a **time-series forecasting problem**.
+
+# FLANN Model
+
+## Functional Link Artificial Neural Network
+
+FLANN is a single-layer neural-network approach that expands the original input features using nonlinear functional transformations.
+
+The project uses **trigonometric functional expansion** to create additional nonlinear representations.
+
+```text
+Original inputs
+      │
+      ▼
+Functional expansion
+      │
+      ├── Original terms
+      ├── Sinusoidal terms
+      └── Cosine terms
+      │
+      ▼
+Expanded feature vector
+      │
+      ▼
+FLANN output
+      │
+      ▼
+Predicted USD/INR
+```
+
+This allows the network to model nonlinear relationships without requiring a deep neural-network architecture.
+
+# MLP Model
+
+A Multilayer Perceptron is used as a neural-network benchmark.
+
+The project uses a hidden-layer architecture based on:
+
+```text
+Input layer
+     │
+     ▼
+8 neurons
+     │
+     ▼
+4 neurons
+     │
+     ▼
+Output
+```
+
+# ARIMA Model
+
+The classical statistical model used for comparison is:
+
+```text
+ARIMA(1,1,1)
+```
+
+where:
+
+```text
+p = 1
+d = 1
+q = 1
+```
+
+ARIMA provides a traditional time-series forecasting baseline.
+
+# Data Scaling
+
+For the neural-network models, input and target values are scaled using **min-max scaling to [-1, 1]**. The scaling parameters are learned from the training data to avoid using information from the test set during preprocessing.
+
+# Evaluation
+
+The models are evaluated on **48 unseen test observations**.
+
+### MAPE
+
+```text
+MAPE = mean(|Actual - Predicted| / |Actual|) × 100
+```
+
+### MAE
+
+```text
+MAE = mean(|Actual - Predicted|)
+```
+
+### RMSE
+
+```text
+RMSE = sqrt(mean((Actual - Predicted)²))
+```
+
+Lower values indicate lower forecasting error.
+
+# Final Results
+
+| Model | MAPE (%) | MAE | RMSE |
 |---|---:|---:|---:|
-| **ARIMA(1,1,1)** | **0.2693** | 0.3399 | 0.2570 |
-| FLANN | 0.3046 | 0.3366 | 0.2908 |
-| MLP | 0.3302 | 0.3799 | 0.3155 |
+| **FLANN** | **0.2899** | **0.2765** | **0.3362** |
+| MLP | 0.3015 | 0.2878 | 0.3688 |
+| ARIMA(1,1,1) | 0.6501 | 0.6226 | 0.7626 |
+
+## Best Model
+
+**FLANN**
+
+FLANN achieved the lowest MAPE:
+
+```text
+0.2899%
+```
+
+It also achieved the lowest MAE and RMSE among the three models in this experiment.
 
 ### Key Finding
 
-ARIMA(1,1,1) achieved the lowest MAPE on this particular real-data
-test window.
+FLANN outperformed the MLP and ARIMA(1,1,1) models on this particular 48-observation test window.
 
-FLANN outperformed MLP, indicating that functional nonlinear expansion
-can provide competitive performance without using a deeper neural
-network.
+This result is specific to the dataset, time period and experimental configuration used in the study. It should not be interpreted as evidence that FLANN will always outperform other forecasting approaches.
 
-The result should not be interpreted as evidence that ARIMA or FLANN
-will always outperform the other models. Performance depends on the
-dataset, forecasting horizon, market regime and evaluation protocol.
+# Example Prediction
 
-## Reproducing with fresh/different data
+For the four recent observations:
 
-Re-run `python src/download_data.py --download` (or just re-run
-`download_data.py`) at any time to pull the latest published rates, then
-`prepare_data.py` to re-slice the most recent 383-record window, then
-`run_project.py` to regenerate all results.
+```text
+95.68
+95.69
+95.69
+95.00
+```
+
+the models produced:
+
+| Model | Predicted USD/INR |
+|---|---:|
+| **FLANN** | **95.2490** |
+| MLP | 94.8686 |
+| ARIMA(1,1,1) | 94.9902 |
+
+The corresponding actual observation used during the test experiment was:
+
+```text
+94.9900
+```
+
+# Visualization
+
+The project generates:
+
+- Actual vs Predicted USD/INR graph
+- Model MAPE comparison graph
+
+Generated result files include:
+
+```text
+results/
+├── actual_vs_predicted.png
+├── forecast_comparison.png
+├── model_comparison.png
+├── model_metrics.csv
+├── model_comparison.csv
+├── model_comparisons.csv
+├── predictions.csv
+└── test_predictions.csv
+```
+
+# Flask Web Application
+
+A Flask-based web interface was developed to make the forecasting system interactive.
+
+The application allows the user to enter:
+
+```text
+t-4
+t-3
+t-2
+t-1
+```
+
+and generates predictions from:
+
+```text
+FLANN
+MLP
+ARIMA(1,1,1)
+```
+
+The interface displays model predictions, model performance, MAPE, MAE, RMSE, graphs and the best-performing model.
+
+```text
+flask_app/
+├── app.py
+├── templates/
+│   └── index.html
+└── static/
+    ├── style.css
+    └── graphs/
+        ├── actual_vs_predicted.png
+        └── model_comparison.png
+```
+
+# MATLAB Implementation
+
+The original research implementation was developed in MATLAB.
+
+```text
+matlab/
+└── run_all.m
+```
+
+The MATLAB implementation represents the original research workflow, while the Python implementation provides a reproducible software pipeline.
+
+# Project Structure
+
+```text
+USDINR-FLANN-Forecasting/
+│
+├── data/
+│   ├── usdinr_raw.csv
+│   └── usdinr_383.csv
+│
+├── flask_app/
+│   ├── app.py
+│   ├── templates/
+│   │   └── index.html
+│   └── static/
+│       ├── style.css
+│       └── graphs/
+│
+├── matlab/
+│   └── run_all.m
+│
+├── results/
+│   ├── actual_vs_predicted.png
+│   ├── forecast_comparison.png
+│   ├── model_comparison.png
+│   ├── model_metrics.csv
+│   ├── model_comparison.csv
+│   ├── model_comparisons.csv
+│   ├── predictions.csv
+│   └── test_predictions.csv
+│
+├── src/
+│   ├── __init__.py
+│   ├── download_data.py
+│   ├── prepare_data.py
+│   ├── flann_model.py
+│   ├── model_comparison.py
+│   ├── test_flann.py
+│   ├── test_mlp.py
+│   ├── test_arima.py
+│   └── run_project.py
+│
+├── .gitignore
+├── README.md
+├── INTERVIEW_NOTES.md
+├── requirements.txt
+└── run_project.bat
+```
+
+# How to Run
+
+## 1. Clone the repository
+
+```bash
+git clone https://github.com/Priyadarshini2/USDINR-FLANN-Forecasting.git
+cd USDINR-FLANN-Forecasting
+```
+
+## 2. Create a virtual environment
+
+```bash
+python -m venv venv
+```
+
+Windows:
+
+```cmd
+venv\Scriptsctivate
+```
+
+## 3. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+## 4. Run the complete forecasting pipeline
+
+```bash
+python src/run_project.py
+```
+
+The pipeline performs:
+
+```text
+Data
+  ↓
+Preparation
+  ↓
+FLANN
+  ↓
+MLP
+  ↓
+ARIMA
+  ↓
+Evaluation
+  ↓
+Results + Graphs
+```
+
+A Windows batch runner is also available:
+
+```text
+run_project.bat
+```
+
+# Running the Flask Application
+
+From the project root:
+
+```bash
+python flask_app/app.py
+```
+
+Then open:
+
+```text
+http://127.0.0.1:5000
+```
+
+# Technologies Used
+
+### Programming
+- Python
+- MATLAB
+
+### Machine Learning
+- NumPy
+- Scikit-learn
+- FLANN
+- MLP
+
+### Time-Series Forecasting
+- Statsmodels
+- ARIMA
+
+### Data Processing
+- Pandas
+
+### Visualization
+- Matplotlib
+
+### Web Development
+- Flask
+- HTML
+- CSS
+
+### Version Control
+- Git
+- GitHub
+
+# Key Contributions
+
+This project demonstrates:
+
+- Real-world time-series data acquisition
+- Time-series preprocessing
+- Lag-feature engineering
+- Functional Link Artificial Neural Network implementation
+- Neural-network forecasting
+- Statistical time-series forecasting
+- Model comparison
+- Quantitative evaluation using MAPE, MAE and RMSE
+- MATLAB-to-Python implementation
+- Flask-based interactive interface
+- Reproducible ML pipeline
+- Git/GitHub project management
+
+# Limitations
+
+The project uses a relatively small experimental window of **383 supervised observations** and a **48-observation test set**.
+
+USD/INR exchange rates are influenced by many external variables that are not included in the current feature set, such as:
+
+- Interest rates
+- Inflation
+- Monetary policy
+- Crude oil prices
+- Foreign capital flows
+- Global economic conditions
+- Geopolitical events
+
+The current model uses only historical USD/INR observations.
+
+Therefore, the system should be considered a **research and educational forecasting system**, not a financial trading or investment recommendation system.
+
+# Future Improvements
+
+Possible extensions include:
+
+- Longer historical training periods
+- Additional economic indicators
+- Volatility features
+- Technical indicators
+- LSTM/GRU comparison
+- XGBoost comparison
+- Transformer-based forecasting
+- Hyperparameter optimization
+- Multi-step forecasting
+- Automated daily data updates
+- Model retraining pipeline
+- Docker deployment
+- Cloud deployment
+- Real-time exchange-rate API integration
+
+# Research Conclusion
+
+The experimental results show that **FLANN achieved the best performance among the three models in the final 48-observation test set**, with a MAPE of **0.2899%**.
+
+The comparison demonstrates that a functional-expansion-based neural architecture can achieve competitive forecasting performance without requiring a deep neural-network structure.
+
+The results are specific to the dataset, time period and experimental configuration used in this study.
+
+---
+
+## Author
+
+**Priyadarshini Behera**
+
+**Project:** Dollar Exchange Rate Prediction Using Functional Link Artificial Neural Network (FLANN)
+
+**Models:** FLANN • MLP • ARIMA(1,1,1)
+
+**Implementation:** MATLAB • Python • Flask
